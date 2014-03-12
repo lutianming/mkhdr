@@ -1,4 +1,3 @@
-HDR
-===
+# mdhdr
 
-create HDR image
+make hdr image
