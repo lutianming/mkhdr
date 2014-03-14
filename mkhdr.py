@@ -1,10 +1,9 @@
-import argparse
 import os
 import sys
 from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
-from ui import start_ui
+
 
 def list_files(dir):
     full_path = [os.path.join(dir, f) for f in os.listdir(dir)]
@@ -144,10 +143,7 @@ def tone_mapping(E):
     return p
 
 
-def make_hdr(filenames, output):
-    print('load images...')
-    images, times = read_images(files)
-
+def make_hdr(images, times):
     print('recover g...')
     g_r, g_g, g_b = recover_g(images, times)
     R = []
@@ -181,30 +177,5 @@ def make_hdr(filenames, output):
     b = Image.fromarray(np.array(p_b, dtype=np.uint8), mode='L')
     img = Image.merge('RGB', (r, g, b))
     img.show()
-    img.save(output)
 
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--directory',
-                        help="""the directory that contains the
-                        original images. If not specified,
-                        the current working direcory is used.""")
-    parser.add_argument('-o', '--output', default='hdr.jpg',
-                        help='the output hdr image filename')
-    parser.add_argument('-g', '--gui',
-                        help='use gui interface', action='store_true')
-
-    # parse arguments
-    args = parser.parse_args()
-    if args.directory:
-        directory = args.directory
-    else:
-        directory = os.getcwd()
-    output = args.output
-
-    if args.gui:
-        start_ui(sys.argv)
-    else:
-        files = list_files(directory)
-        make_hdr(files, output)
+    return img
