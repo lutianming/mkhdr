@@ -105,33 +105,37 @@ def weight_function(z):
         return z_max - z + 1
 
 
+def gen_weight_map():
+    w = [weight_function(z) for z in range(256)]
+    return w
+
+
 def radiance(g, imgs, times, w):
     n_imgs = len(imgs)
     width, height = imgs[0].size
-    pixels = np.zeros((width*height, n_imgs))
+    length = width*height
+    pixels = np.zeros((length, n_imgs), dtype=np.int8)
+    tmp = np.zeros((length, n_imgs))
+    weight = np.zeros((length, n_imgs))
+
     for i, im in enumerate(imgs):
         pixels[:, i] = np.array(im).flatten()
-    lnE = np.zeros(width*height)
+
+    # for z in range(256):
+    #     rows, cols = np.where(pixels == z)
+    #     tmp[rows, cols] = g[z]
+    #     weight[rows, cols] = w(z)
+    # tmp = tmp - np.log(times)
 
     vfun = np.vectorize(lambda z: g[z])
     tmp = vfun(pixels)
     tmp = tmp - np.log(times)
 
-    vfun = np.vectorize(lambda z: w(z))
+    vfun = np.vectorize(lambda z: w[z])
     weight = vfun(pixels)
 
     lnE = np.sum(weight*tmp, axis=1) / np.sum(weight, axis=1)
     return lnE.reshape((height, width))
-    # for i in range(width):
-    #     for j in range(height):
-    #         a = 0
-    #         b = 0
-    #         for p in range(n_imgs):
-    #             img = imgs[p]
-    #             z = img.getpixel((i, j))
-    #             a = a + w(z)*(g[z]-np.log(times[p]))
-    #             b = b + w(z)
-    #         lnE[i, j] = float(a)/b
 
 
 def tone_mapping(E):
@@ -151,19 +155,22 @@ if __name__ == '__main__':
                         the current working direcory is used.""")
     parser.add_argument('-o', '--output', default='hdr.jpg',
                         help='the output hdr image filename')
+    parser.add_argument('-g', '--gui',
+                        help='use gui interface', action='store_true')
 
+    # parse arguments
     args = parser.parse_args()
-
     if args.directory:
         directory = args.directory
     else:
         directory = os.getcwd()
+    output = args.output
 
-        output = args.output
-
+    print('load images...')
     files = list_files(directory)
     images, times = read_images(files)
 
+    print('recover g...')
     g_r, g_g, g_b = recover_g(images, times)
     R = []
     G = []
@@ -174,24 +181,26 @@ if __name__ == '__main__':
         G.append(g)
         B.append(b)
 
-    lnE_r = radiance(g_r, R, times, weight_function)
+    w = gen_weight_map()
+    print('radiance r')
+    lnE_r = radiance(g_r, R, times, w)
     E_r = np.exp(lnE_r)
     p_r = tone_mapping(E_r)
 
-    lnE_g = radiance(g_g, G, times, weight_function)
+    print('radiance g')
+    lnE_g = radiance(g_g, G, times, w)
     E_g = np.exp(lnE_g)
     p_g = tone_mapping(E_g)
 
-    lnE_b = radiance(g_b, B, times, weight_function)
+    print('radiance g')
+    lnE_b = radiance(g_b, B, times, w)
     E_b = np.exp(lnE_b)
     p_b = tone_mapping(E_b)
 
+    print('display result')
     r = Image.fromarray(np.array(p_r, dtype=np.uint8), mode='L')
-    r.show()
     g = Image.fromarray(np.array(p_g, dtype=np.uint8), mode='L')
-    g.show()
     b = Image.fromarray(np.array(p_b, dtype=np.uint8), mode='L')
-    b.show()
     img = Image.merge('RGB', (r, g, b))
     img.show()
 
