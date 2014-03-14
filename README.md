@@ -1,4 +1,4 @@
-# mdhdr
+# mkhdr
 
 Make HDR image from images with different exposure times.
 
@@ -9,8 +9,14 @@ Make HDR image from images with different exposure times.
 + [pyside(optional)](qt-project.org/wiki/PySide)
 
 ## Usage
--d, --directory    the directory that contains the original images. If not specified, the current working direcory is used.
+-d DIR, --directory DIR
 
--o, --output       the output filename, default is *hdf.jpg*
+the directory that contains the original images. If not specified, the current working direcory is used.
 
--g, --gui          use gui interface
+-o OUTPUT, --output OUTPUT
+
+the output filename, default is *hdf.jpg*
+
+-g, --gui
+
+use gui interface
