@@ -54,13 +54,13 @@ def recover_g(imgs, times):
     l = 100
     g_r, lE_r = solve_g(Z_R, B, l, weight_function)
     g_g, lE_g = solve_g(Z_G, B, l, weight_function)
-
     g_b, lE_b = solve_g(Z_B, B, l, weight_function)
-    x = np.arange(0, 256)
-    plt.plot(g_r, x)
-    plt.plot(g_g, x)
-    plt.plot(g_b, x)
-    plt.show()
+
+    # x = np.arange(0, 256)
+    # plt.plot(g_r, x)
+    # plt.plot(g_g, x)
+    # plt.plot(g_b, x)
+    # plt.show()
     return g_r, g_g, g_b
 
 
@@ -166,7 +166,7 @@ def make_hdr(images, times):
     E_g = np.exp(lnE_g)
     p_g = tone_mapping(E_g)
 
-    print('radiance g')
+    print('radiance b')
     lnE_b = radiance(g_b, B, times, w)
     E_b = np.exp(lnE_b)
     p_b = tone_mapping(E_b)
@@ -176,6 +176,4 @@ def make_hdr(images, times):
     g = Image.fromarray(np.array(p_g, dtype=np.uint8), mode='L')
     b = Image.fromarray(np.array(p_b, dtype=np.uint8), mode='L')
     img = Image.merge('RGB', (r, g, b))
-    img.show()
-
     return img
