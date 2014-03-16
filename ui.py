@@ -3,7 +3,25 @@ import sys
 from PySide.QtCore import *
 from PySide.QtGui import *
 from mkhdr import *
-from PIL import ImageQt
+from PIL import Image
+
+
+class HDRSignal(QObject):
+    sig = Signal(Image)
+
+
+class HDRThread(QThread):
+    def __init__(self, parent=None):
+        super(HDRThread, self).__init__(parent)
+        self.signal = HDRSignal()
+        self.status = 0
+
+    def run(self):
+        parent = self.parent()
+        images = parent.images
+        times = parent.times
+        parent.hdr = make_hdr(images, times)
+        # self.signal.emit(hdr)
 
 
 class ImageWindow(QMainWindow):
@@ -15,19 +33,24 @@ class ImageWindow(QMainWindow):
         self.hdr = None
 
         self.setWindowTitle('mkhdr')
-        loadAction = QAction('&Load', self)
-        loadAction.triggered.connect(self.load_images)
+        self.loadAction = QAction('&Load', self)
+        self.loadAction.triggered.connect(self.load_images)
 
-        hdrAction = QAction('HDR', self)
-        hdrAction.triggered.connect(self.gen_hdr)
+        self.hdrAction = QAction('HDR', self)
+        self.hdrAction.triggered.connect(self.gen_hdr)
+        self.hdr_thread = HDRThread(self)
+        # self.hdr_thread.signal.sig.connect(self.update_hdr)
+        self.hdr_thread.started.connect(self.hdr_thread_start)
+        self.hdr_thread.finished.connect(self.hdr_thread_finished)
+        self.hdr_thread.finished.connect(self.update_hdr)
 
-        saveAction = QAction('Save', self)
-        saveAction.triggered.connect(self.save_hdr)
+        self.saveAction = QAction('Save', self)
+        self.saveAction.triggered.connect(self.save_hdr)
 
         self.toolbar = self.addToolBar('toolbar')
-        self.toolbar.addAction(loadAction)
-        self.toolbar.addAction(hdrAction)
-        self.toolbar.addAction(saveAction)
+        self.toolbar.addAction(self.loadAction)
+        self.toolbar.addAction(self.hdrAction)
+        self.toolbar.addAction(self.saveAction)
 
         main_widget = QWidget(self)
         hbox = QHBoxLayout(main_widget)
@@ -39,15 +62,13 @@ class ImageWindow(QMainWindow):
 
         self.image_scene = QGraphicsScene()
         mainview = QGraphicsView(self.image_scene)
-        # self.image_label = QLabel(self)
-        # self.image_label.setText('test')
 
         hbox.addWidget(self.image_listview, stretch=1)
-        # hbox.addWidget(self.image_label, stretch=4)
         hbox.addWidget(mainview, stretch=4)
 
         main_widget.setLayout(hbox)
         self.setCentralWidget(main_widget)
+        self.statusBar().showMessage('Ready')
         self.show()
 
     def load_images(self):
@@ -61,36 +82,42 @@ class ImageWindow(QMainWindow):
             print(fnames)
             self.images, self.times = read_images(fnames)
             self.listview_model.clear()
-            # for img in images:
-            #     tmp = img.copy()
-            #     tmp.thumbnail((128, 128))
-            #     imgqt = ImageQt.ImageQt(tmp)
-            #     pixmap = QPixmap.fromImage(imgqt)
-            #     icon = QIcon(pixmap)
-
-            #     item = QStandardItem(icon, 'image')
-            #     self.listview_model.appendRow(item)
             for f in fnames:
                 icon = QIcon(f)
                 item = QStandardItem(icon, os.path.basename(f))
                 self.listview_model.appendRow(item)
+                self.statusBar().showMessage('Images loaded')
 
     def save_hdr(self):
         if self.hdr:
             fname, _ = QFileDialog.getSaveFileName(self, 'Save HDF', './')
             self.hdr.save(fname)
+            self.statusBar().showMessage('HDR image saved')
         else:
             QMessageBox.warning(self, 'warning',
                                 'Please generate a HDR image before saving')
 
     def gen_hdr(self):
-        self.hdr = make_hdr(self.images, self.times)
+        if not self.hdr_thread.isRunning():
+            self.hdrAction.setEnabled(False)
+            self.hdr_thread.start()
+            # self.hdr = make_hdr(self.images, self.times)
+
+    def hdr_thread_start(self):
+        self.hdrAction.setEnabled(False)
+
+    def hdr_thread_finished(self):
+        self.hdrAction.setEnabled(True)
+
+    def update_hdr(self):
         data = self.hdr.tostring('raw', 'RGB')
         img = QImage(data, self.hdr.size[0], self.hdr.size[1],
                      QImage.Format_RGB888)
         pixmap = QPixmap.fromImage(img)
         self.image_scene.clear()
         self.image_scene.addPixmap(pixmap)
+        self.statusBar().showMessage('HDR image generated')
+
 
 def start_ui(argv):
     app = QApplication(argv)
