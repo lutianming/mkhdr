@@ -21,6 +21,7 @@ def read_images(filenames):
     # sort by image exposure time
     images.sort(key=exposure_time)
     times = [exposure_time(im) for im in images]
+    images = [np.array(im, dtype=np.int) for im in images]
     return images, times
 
 
@@ -30,38 +31,21 @@ def exposure_time(im):
     return float(a)/b
 
 
-def recover_g(imgs, times):
+def recover_g(imgs, times, index_x, index_y):
     n_imgs = len(imgs)
 
-    tmp = imgs[0].copy()
-    tmp.thumbnail((20, 20))
-    width, height = tmp.size
-    n_pixels = width*height
+    n_samples = 200
+    x, y = imgs[0].shape
+
     B = np.log(times)
+    Z = np.zeros((n_samples, n_imgs))
 
-    Z_R = np.zeros((n_pixels, n_imgs))
-    Z_G = np.zeros((n_pixels, n_imgs))
-    Z_B = np.zeros((n_pixels, n_imgs))
-    # split rgb
     for i, im in enumerate(imgs):
-        im = im.copy()
-        im.thumbnail((width, height))
-        r, g, b = im.split()
-        Z_R[:, i] = np.array(r, dtype=np.int).flatten()
-        Z_G[:, i] = np.array(g, dtype=np.int).flatten()
-        Z_B[:, i] = np.array(b, dtype=np.int).flatten()
+        Z[:, i] = np.array(im[index_x, index_y], dtype=np.int).flatten()
 
-    l = 100
-    g_r, lE_r = solve_g(Z_R, B, l, weight_function)
-    g_g, lE_g = solve_g(Z_G, B, l, weight_function)
-    g_b, lE_b = solve_g(Z_B, B, l, weight_function)
-
-    # x = np.arange(0, 256)
-    # plt.plot(g_r, x)
-    # plt.plot(g_g, x)
-    # plt.plot(g_b, x)
-    # plt.show()
-    return g_r, g_g, g_b
+    l = 1000
+    g, lE = solve_g(Z, B, l, weight_function)
+    return g
 
 
 def solve_g(Z, B, l, w):
@@ -112,14 +96,12 @@ def gen_weight_map():
 
 def radiance(g, imgs, times, w):
     n_imgs = len(imgs)
-    width, height = imgs[0].size
+    width, height = imgs[0].shape
     length = width*height
     pixels = np.zeros((length, n_imgs), dtype=np.int8)
-    tmp = np.zeros((length, n_imgs))
-    weight = np.zeros((length, n_imgs))
 
     for i, im in enumerate(imgs):
-        pixels[:, i] = np.array(im).flatten()
+        pixels[:, i] = im.flatten()
 
     # for z in range(256):
     #     rows, cols = np.where(pixels == z)
@@ -135,7 +117,7 @@ def radiance(g, imgs, times, w):
     weight = vfun(pixels)
 
     lnE = np.sum(weight*tmp, axis=1) / np.sum(weight, axis=1)
-    return lnE.reshape((height, width))
+    return lnE.reshape((width, height))
 
 
 def tone_mapping(E):
@@ -144,36 +126,33 @@ def tone_mapping(E):
 
 
 def make_hdr(images, times):
-    print('recover g...')
-    g_r, g_g, g_b = recover_g(images, times)
-    R = []
-    G = []
-    B = []
-    for img in images:
-        r, g, b = img.split()
-        R.append(r)
-        G.append(g)
-        B.append(b)
-
+    ndim = images[0].ndim
     w = gen_weight_map()
-    print('radiance r')
-    lnE_r = radiance(g_r, R, times, w)
-    E_r = np.exp(lnE_r)
-    p_r = tone_mapping(E_r)
+    x = images[0].shape[0]
+    y = images[1].shape[1]
+    if ndim == 3:
+        colors = images[0].shape[2]
+    else:
+        colors = 1
 
-    print('radiance g')
-    lnE_g = radiance(g_g, G, times, w)
-    E_g = np.exp(lnE_g)
-    p_g = tone_mapping(E_g)
+    subs = []
+    n_samples = 200
+    index_x = np.random.randint(0, x, n_samples)
+    index_y = np.random.randint(0, y, n_samples)
+    gs = []
+    for i in range(colors):
+        subimgs = [im[:, :, i] for im in images]
+        g = recover_g(subimgs, times, index_x, index_y)
+        gs.append(g)
+        lnE = radiance(g, subimgs, times, w)
+        E = np.exp(lnE)
+        p = tone_mapping(E)
+        subimg = Image.fromarray(np.array(p, dtype=np.int8), mode='L')
+        subs.append(subimg)
 
-    print('radiance b')
-    lnE_b = radiance(g_b, B, times, w)
-    E_b = np.exp(lnE_b)
-    p_b = tone_mapping(E_b)
-
-    print('display result')
-    r = Image.fromarray(np.array(p_r, dtype=np.uint8), mode='L')
-    g = Image.fromarray(np.array(p_g, dtype=np.uint8), mode='L')
-    b = Image.fromarray(np.array(p_b, dtype=np.uint8), mode='L')
-    img = Image.merge('RGB', (r, g, b))
+    x = np.arange(0, 256)
+    for g in gs:
+        plt.plot(g, x)
+    plt.show()
+    img = Image.merge('RGB', (subs[0], subs[1], subs[2]))
     return img
