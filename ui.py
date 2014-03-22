@@ -75,9 +75,9 @@ class ImageWindow(QMainWindow):
         fnames, _ = QFileDialog.getOpenFileNames(self, 'Open files', './')
         if len(fnames) == 0:
             return
-        if len(fnames) < 4:
+        if len(fnames) < 2:
             QMessageBox.warning(self, 'warning',
-                                'please choose no less than 4 images')
+                                'please choose no less than 2 images')
         else:
             print(fnames)
             self.images, self.times = read_images(fnames)
