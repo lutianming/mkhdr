@@ -33,7 +33,7 @@ def exposure_time(im):
     return float(a)/b
 
 
-def recover_g(imgs, times, index_x, index_y):
+def recover_g(imgs, times, index_x, index_y, smooth_factor=50):
     n_imgs = len(imgs)
 
     n_samples = 200
@@ -45,8 +45,7 @@ def recover_g(imgs, times, index_x, index_y):
     for i, im in enumerate(imgs):
         Z[:, i] = np.array(im[index_x, index_y], dtype=np.int).flatten()
 
-    l = 100
-    g, lE = solve_g(Z, B, l, weight_function)
+    g, lE = solve_g(Z, B, smooth_factor, weight_function)
     return g
 
 
@@ -96,7 +95,7 @@ def gen_weight_map():
     return w
 
 
-def radiance(g, imgs, times, w):
+def radiance_map(g, imgs, times, w):
     n_imgs = len(imgs)
     width, height = imgs[0].shape
     length = width*height
@@ -113,16 +112,22 @@ def radiance(g, imgs, times, w):
     return np.exp(lnE.reshape((width, height)))
 
 
-def globals_simple(E):
+def global_simple(E):
     p = E / (E+1) * 255
     return p
 
 
-def local_tone_mapping(R, G, B, sigma_r=0.4, sigma_d=100):
-    intensity = 0.2989*R + 0.5866*G + 0.1145*B
-    r = R / intensity
-    g = G / intensity
-    b = B / intensity
+def luminance(R, G, B):
+    return 0.2989*R+0.5866*G+0.1145*B
+
+
+def local_durand(E, sigma_r=0.4, sigma_d=100):
+    intensity = luminance(E[:, :, 0],
+                          E[:, :, 1],
+                          E[:, :, 2])
+
+    x, y = intensity.shape
+    n_channels = 3
     log_in_intensity = np.log(intensity).astype(np.float32)
     # log_base = filter.denoise_bilateral(log_in_intensity, sigma_r, sigma_d)
     log_base = cv2.bilateralFilter(log_in_intensity, 5, 50, 50)
@@ -132,60 +137,72 @@ def local_tone_mapping(R, G, B, sigma_r=0.4, sigma_d=100):
     scaleFactor = np.max(log_base)*compressFactor
 
     log_out_intensity = log_base*compressFactor - scaleFactor + log_detail
-    R = r * np.exp(log_out_intensity)
-    G = g * np.exp(log_out_intensity)
-    B = b * np.exp(log_out_intensity)
-    return R, G, B
+
+    img = np.zeros((x, y, n_channels))
+    for i in range(n_channels):
+        channel = E[:, :, i] / intensity
+        channel = channel*np.exp(log_out_intensity)
+        img[:, :, i] = channel / (1 + channel) * 255
+    return img
 
 
-def reinhards_global(E, a=0.18):
+def global_reinhards(E, a=0.48, saturation=0.6):
     delta = 0.0001
-    x = E.shape[0]
-    y = E.shape[1]
-    L_w = np.exp(np.sum(np.log(delta + E)) / (x*y))
-    L_xy = a * (E/L_w)
-    L_d = L_xy / (1 + L_xy) * 256
-    return L_d
+
+    L = luminance(E[:, :, 0],
+                  E[:, :, 1],
+                  E[:, :, 2])
+
+    x = L.shape[0]
+    y = L.shape[1]
+    L_w = np.exp(np.sum(np.log(delta + L)) / (x*y))
+    L_xy = a * (L/L_w)
+    L_d = L_xy / (1 + L_xy)
+
+    img = np.zeros((x, y, 3))
+    for i in range(3):
+        channel = np.power(E[:, :, i] / L, saturation) * L_d * 255
+        channel[channel > 255] = 255
+        img[:, :, i] = channel
+    return img
+
+tone_mapping_operators = {
+    "global_simple": global_simple,
+    "global_reinhards": global_reinhards,
+    "local_durand": local_durand,
+}
 
 
-def make_hdr(images, times):
+def make_hdr(images, times, op_name="global_reinhards"):
     ndim = images[0].ndim
     w = gen_weight_map()
     x = images[0].shape[0]
     y = images[1].shape[1]
     if ndim == 3:
-        colors = images[0].shape[2]
+        n_channels = images[0].shape[2]
     else:
-        colors = 1
+        n_channels = 1
 
-    subs = []
     n_samples = 200
     index_x = np.random.randint(0, x, n_samples)
     index_y = np.random.randint(0, y, n_samples)
-    gs = []
-    Es = []
-    tone_mapping = reinhards_global
-    for i in range(colors):
+    g = np.zeros((n_channels, 256))
+    E = np.zeros((x, y, n_channels))
+
+    for i in range(n_channels):
         subimgs = [im[:, :, i] for im in images]
         print("recover g")
-        g = recover_g(subimgs, times, index_x, index_y)
-        gs.append(g)
-        print("radiance")
-        E = radiance(g, subimgs, times, w)
-        print("tone mapping")
-        p = tone_mapping(E)
-        # Es.append(p)
+        g[i, :] = recover_g(subimgs, times, index_x, index_y)
+        print("radiance_map")
+        E[:, :, i] = radiance_map(g[i, :], subimgs, times, w)
 
-        subimg = Image.fromarray(np.array(p, dtype=np.int8), mode='L')
-        subs.append(subimg)
-    # R, G, B = local_tone_mapping(Es[0], Es[1], Es[2])
-    # img_R = Image.fromarray(np.array(R, dtype=np.int8), mode='L')
-    # img_G = Image.fromarray(np.array(G, dtype=np.int8), mode='L')
-    # img_B = Image.fromarray(np.array(B, dtype=np.int8), mode='L')
-    x = np.arange(0, 256)
-    for g in gs:
-        plt.plot(g, x)
-    plt.show()
-    img = Image.merge('RGB', (subs[0], subs[1], subs[2]))
-    # img = Image.merge('RGB', (img_R, img_G, img_B))
+    print("tone mapping")
+    tone_mapping = tone_mapping_operators[op_name]
+
+    img = tone_mapping(E)
+    img = Image.fromarray(img.astype(np.int8), mode='RGB')
+    # x = np.arange(0, 256)
+    # for g in gs:
+    #     plt.plot(g, x)
+    # plt.show()
     return img
