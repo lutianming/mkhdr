@@ -173,7 +173,18 @@ tone_mapping_operators = {
 }
 
 
-def make_hdr(images, times, op_name="global_reinhards"):
+def default_args(args):
+    if not args:
+        args = {}
+    if "lambda" not in args:
+        args["lambda"] = 50
+    if "tone_mapping_op" not in args:
+        args["tone_mapping_op"] = "global_reinhards"
+    return args
+
+
+def make_hdr(images, times, args=None):
+    args = default_args(args)
     ndim = images[0].ndim
     w = gen_weight_map()
     x = images[0].shape[0]
@@ -192,12 +203,12 @@ def make_hdr(images, times, op_name="global_reinhards"):
     for i in range(n_channels):
         subimgs = [im[:, :, i] for im in images]
         print("recover g")
-        g[i, :] = recover_g(subimgs, times, index_x, index_y)
+        g[i, :] = recover_g(subimgs, times, index_x, index_y, args["lambda"])
         print("radiance_map")
         E[:, :, i] = radiance_map(g[i, :], subimgs, times, w)
 
     print("tone mapping")
-    tone_mapping = tone_mapping_operators[op_name]
+    tone_mapping = tone_mapping_operators[args["tone_mapping_op"]]
 
     img = tone_mapping(E)
     img = Image.fromarray(img.astype(np.int8), mode='RGB')

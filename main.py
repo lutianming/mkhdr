@@ -15,11 +15,16 @@ if __name__ == '__main__':
                         help='use gui interface', action='store_true')
     parser.add_argument('-tmp', '--tone-mapping-op',
                         default="global_reinhards",
+                        choices=["global_simple", "global_reinhards",
+                                 "local_durand"],
                         help="tone mapping operator. Supported options: \
                         global_simple, global_reinhards, local_durand")
+    parser.add_argument('-l', '--lambda', type=int, default=50,
+                        help="smooth factor used when recovering reponse curve")
 
     # parse arguments
     args = parser.parse_args()
+
     if args.directory:
         directory = args.directory
     else:
@@ -31,5 +36,5 @@ if __name__ == '__main__':
     else:
         files = list_files(directory)
         images, times = read_images(files)
-        hdr = make_hdr(images, times, args.tone_mapping_op)
+        hdr = make_hdr(images, times, vars(args))
         hdr.save(output)
