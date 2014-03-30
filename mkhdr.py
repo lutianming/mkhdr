@@ -7,8 +7,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def list_files(dir):
-    full_path = [os.path.join(dir, f) for f in os.listdir(dir)]
+def list_files(d):
+    full_path = [os.path.join(d, f) for f in os.listdir(d)]
     files = [f for f in full_path
              if os.path.isfile(f)]
     return files
