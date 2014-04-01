@@ -1,10 +1,8 @@
 import os
-import sys
 from PIL import Image
-from skimage import filter
-import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+import cv2
 
 
 def list_files(d):
@@ -188,13 +186,13 @@ def make_hdr(images, times, args=None):
     ndim = images[0].ndim
     w = gen_weight_map()
     x = images[0].shape[0]
-    y = images[1].shape[1]
+    y = images[0].shape[1]
     if ndim == 3:
         n_channels = images[0].shape[2]
     else:
         n_channels = 1
 
-    n_samples = 200
+    n_samples = args['samples']
     index_x = np.random.randint(0, x, n_samples)
     index_y = np.random.randint(0, y, n_samples)
     g = np.zeros((n_channels, 256))
@@ -204,7 +202,7 @@ def make_hdr(images, times, args=None):
         subimgs = [im[:, :, i] for im in images]
         print("recover g")
         g[i, :] = recover_g(subimgs, times, index_x, index_y, args["lambda"])
-        print("radiance_map")
+        print("radiance map")
         E[:, :, i] = radiance_map(g[i, :], subimgs, times, w)
 
     print("tone mapping")

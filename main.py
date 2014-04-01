@@ -20,8 +20,11 @@ if __name__ == '__main__':
                         help="tone mapping operator. Supported options: \
                         global_simple, global_reinhards, local_durand")
     parser.add_argument('-l', '--lambda', type=int, default=50,
-                        help="smooth factor used when recovering reponse curve")
-
+                        help="smooth factor used when recovering\
+                        response curve")
+    parser.add_argument('-s', '--samples', type=int, default=200,
+                        help='number of sample pixels used for\
+                        recovering response curve')
     # parse arguments
     args = parser.parse_args()
 
