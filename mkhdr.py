@@ -201,8 +201,6 @@ def make_hdr(images, times, args=None):
     index_x = np.linspace(border, x-border, nsqrt).astype(np.int)
     index_y = np.linspace(border, y-border, nsqrt).astype(np.int)
     index_x, index_y = np.meshgrid(index_x, index_y)
-    print(index_x.shape)
-    print(index_y.shape)
     g = np.zeros((n_channels, 256))
     E = np.zeros((x, y, n_channels))
 
