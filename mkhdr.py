@@ -164,11 +164,14 @@ def global_reinhards(E, a=0.48, saturation=0.6):
         img[:, :, i] = channel
     return img
 
+#tone mapping operator warppers so that they all except same args
 tone_mapping_operators = {
-    "global_simple": global_simple,
-    "global_reinhards": global_reinhards,
-    "local_durand": local_durand,
-}
+    "global_simple":
+    lambda E, args: global_simple(E),
+    "global_reinhards":
+    lambda E, args: global_reinhards(E, args['a'], args['saturation']),
+    "local_durand":
+    lambda E, args: local_durand(E, args['sigma_r'], args['sigma_d'])}
 
 
 def default_args(args):
@@ -208,7 +211,7 @@ def make_hdr(images, times, args=None):
     print("tone mapping")
     tone_mapping = tone_mapping_operators[args["tone_mapping_op"]]
 
-    img = tone_mapping(E)
+    img = tone_mapping(E, args)
     img = Image.fromarray(img.astype(np.int8), mode='RGB')
     # x = np.arange(0, 256)
     # for g in gs:

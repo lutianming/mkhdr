@@ -25,6 +25,14 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--samples', type=int, default=200,
                         help='number of sample pixels used for\
                         recovering response curve')
+    parser.add_argument('--sigma-r', type=float, default=0.4,
+                        help='sigma r used in local durand operator')
+    parser.add_argument('--sigma-d', type=float, default=100,
+                        help='sigma d used in local durand operator')
+    parser.add_argument('--a', type=float, default=0.48,
+                        help='a used in global reinhards operator')
+    parser.add_argument('--saturation', type=float, default=0.6,
+                        help='saturation used in global reinhards operator')
     # parse arguments
     args = parser.parse_args()
 
