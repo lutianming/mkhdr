@@ -34,7 +34,7 @@ def exposure_time(im):
 def recover_g(imgs, times, index_x, index_y, smooth_factor=50):
     n_imgs = len(imgs)
 
-    n_samples = 200
+    n_samples = index_x.size
     x, y = imgs[0].shape
 
     B = np.log(times)
@@ -196,8 +196,13 @@ def make_hdr(images, times, args=None):
         n_channels = 1
 
     n_samples = args['samples']
-    index_x = np.random.randint(0, x, n_samples)
-    index_y = np.random.randint(0, y, n_samples)
+    nsqrt = int(np.sqrt(n_samples))
+    border = 10
+    index_x = np.linspace(border, x-border, nsqrt).astype(np.int)
+    index_y = np.linspace(border, y-border, nsqrt).astype(np.int)
+    index_x, index_y = np.meshgrid(index_x, index_y)
+    print(index_x.shape)
+    print(index_y.shape)
     g = np.zeros((n_channels, 256))
     E = np.zeros((x, y, n_channels))
 
