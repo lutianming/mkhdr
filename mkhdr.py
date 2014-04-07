@@ -159,9 +159,14 @@ def global_reinhards(E, a=0.48, saturation=0.6):
 
     img = np.zeros((x, y, 3))
     for i in range(3):
-        channel = np.power(E[:, :, i] / L, saturation) * L_d * 255
+        channel = np.power(E[:, :, i] / L, saturation) * L_d
+        channel = channel * 255
         channel[channel > 255] = 255
         img[:, :, i] = channel
+    return img
+
+def gamma_correct(img, gamma):
+    img = np.power(img, gamma)
     return img
 
 #tone mapping operator warppers so that they all except same args
