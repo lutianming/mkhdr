@@ -4,7 +4,11 @@ from PySide.QtCore import *
 from PySide.QtGui import *
 from mkhdr import *
 from PIL import Image
-
+import matplotlib
+matplotlib.use('Qt4Agg')
+matplotlib.rcParams['backend.qt4'] = 'PySide'
+from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
 
 class HDRSignal(QObject):
     sig = Signal(Image)
@@ -21,7 +25,7 @@ class HDRThread(QThread):
         images = parent.images
         times = parent.times
         args = parent.get_parameter()
-        parent.hdr = make_hdr(images, times, args)
+        parent.hdr, parent.g = make_hdr(images, times, args)
 
 
 class ImageWindow(QMainWindow):
@@ -32,6 +36,7 @@ class ImageWindow(QMainWindow):
         self.images = None
         self.times = None
         self.hdr = None
+        self.g = None
 
         self.setWindowTitle('mkhdr')
         self.loadAction = QAction('&Load', self)
@@ -121,6 +126,11 @@ class ImageWindow(QMainWindow):
         formbox.addRow('saturation', self.saturation_box)
         self._reset_parameters()
 
+        #figure to show g plot
+        self.figure = Figure()
+        self.canvas = FigureCanvas(self.figure)
+        formbox.addRow(self.canvas)
+
         #add widgets to main layout
         hbox.addWidget(image_listview, stretch=1)
         hbox.addWidget(self.mainview, stretch=4)
@@ -178,6 +188,7 @@ class ImageWindow(QMainWindow):
         self.image_scene.addPixmap(pixmap)
         self.mainview.fitInView(self.mainview.sceneRect(),
                                 aspectRadioMode=Qt.KeepAspectRatio)
+        self.plot_g()
         self.statusBar().showMessage('HDR image generated')
 
     def get_parameter(self):
@@ -202,6 +213,16 @@ class ImageWindow(QMainWindow):
         self.a_box.setValue(args['a'])
         self.saturation_box.setValue(args['saturation'])
 
+    def plot_g(self):
+        x = range(0, 256)
+        g = self.g
+        channels = g.shape[0]
+        ax = self.figure.add_subplot(111)
+        ax.clear()
+        for channel in range(channels):
+            ax.plot(x, g[channel, :])
+        # refresh canvas
+        self.canvas.draw()
 
 def start_ui(argv, args):
     app = QApplication(argv)

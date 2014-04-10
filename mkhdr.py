@@ -232,4 +232,4 @@ def make_hdr(images, times, args=None):
     # for g in gs:
     #     plt.plot(g, x)
     # plt.show()
-    return img
+    return img, g
