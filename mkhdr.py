@@ -4,6 +4,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 
+LAMBDA = 'lambda'
+SMOOTH = 'smooth'
+TONE_MAPPING_OP = 'tone_mapping_op'
+SIGMA_R = 'sigma_r'
+SIGMA_D = 'sigma_d'
+A = 'a'
+SATURATION = 'saturation'
 
 def list_files(d):
     full_path = [os.path.join(d, f) for f in os.listdir(d)]

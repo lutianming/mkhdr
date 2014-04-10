@@ -1,4 +1,5 @@
 import argparse
+import sys
 from mkhdr import *
 from ui import start_ui
 
@@ -43,7 +44,8 @@ if __name__ == '__main__':
     output = args.output
 
     if args.gui:
-        start_ui(sys.argv)
+        print(vars(args))
+        start_ui(sys.argv, vars(args))
     else:
         files = list_files(directory)
         images, times = read_images(files)
