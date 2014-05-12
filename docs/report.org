@@ -1,0 +1,93 @@
+#+TITLE: Project SI241: Creation HDR images
+#+AUTHOR: LU Tianming, TAI Yang
+#+LATEX_HEADER: \usepackage{amsmath}
+
+* Introduction
+  In this project, we create HDR(High dynamic range) images from a set of low dynamic range images with different exposure times. The method in the project consists of two parts: radiance map reconstruction and tone mapping. Radiance map is basedon the paper "Recovering high dynamic range radiance maps from photographs" by P. Debevec and J. Malik. And two tone mapping operators, based on Durand 2002 and E. Reinhard 2002 are implemented.
+
+* Radiance Map Reconstruction
+  It takes two steps to reconstruct the radiance map.
+  1. Recovering the response curve
+  2. Constructing the High Dynamic Range Radiance Map
+** Recovering the response curve
+   \[ Z_{ij} = f(E_{i}\Delta t_{j}) \]
+
+   \[ f^{-1}(Z_{ij}) = E_{i}\Delta t_{j} \]
+
+   \[ \ln f^{-1}(Z_{ij}) = \ln E_{i} + \ln \Delta t_{j} \]
+
+   define \(g = \ln f^{-1} \), then
+
+   \[ g(Z_{ij}) = \ln E_{i} + \ln \Delta t_{j} \]
+
+
+   \[ \mathcal{O} = \sum\limits_{i=1}^{N} \sum\limits_{j=1}^{P}\left[ g(Z_{ij})-\ln E_{i} - \ln \Delta{t_{j}} \right]^{2} + \lambda \sum\limits_{z=Z_{min}+1}^{Z_{max}-1} g''(z)^{2} \]
+
+   \[
+   w(z) = \left\{ \begin{array}{rl}
+   z - Z_{min} & \text{for } z \leq \frac{1}{2}(Z_{min}+Z_{max}) \\
+   Z_{max} - z & \text{for } z > \frac{1}{2}(Z_{min}+Z_{max})
+   \end{array} \right.
+   \]
+
+   \[ \mathcal{O} = \sum\limits_{i=1}^{N} \sum\limits_{j=1}^{P}
+   \left\{ w(Z_{ij})\left[ g(Z_{ij})-\ln E_{i} - \ln \Delta{t_{j}} \right]\right\}^{2} + \lambda \sum\limits_{z=Z_{min}+1}^{Z_{max}-1} [w(z)g''(z)]^{2} \]
+
+** Constructing the radiance map
+
+   \[ \ln E_{i} = g(Z_{ij}) - \ln \Delta t_{j} \]
+
+   \[ \ln E_{i} = \frac{\sum\limits_{j=1}^{P} w(Z_{ij})(g(Z_{ij} - \ln \Delta t_{j}))}{ \sum\limits_{j=1}^{P}w(Z_{ij})} \]
+
+* Tone mapping
+  Though we have the radiance map now, we still can not display the image in high dynamic range because all the screens , monitors and projectors only have a limited dynamic range. So we have to use the /Tone mapping/ method to approximate the appearance of HDR images in a medium that has limited dynamic range. And there are many different /tone mapping/ operators.
+** Simple operators
+   There are some very simple operators. The first one is just simply linearly mapping the radiance map into 0-255 to produce the result.
+   \[ I = (E - \min(E)) / (\max(E) - \min(E)) * 255 \]
+
+   We can also first map E to \( E/(E+1) \) before mapping to 255, thus
+
+   \[ I = E/(E+1) * 255 \]
+
+   But those simple operators can not get a result good enough. We need some operators more accuracy.
+
+** Global operator Reinhards
+   we view the log-average luminance as a useful approximation to the key of the scene. This quantity \( \overline{L}_{w} \)is computed by:
+
+   \[ \overline{L}_{w} = \frac{1}{N} exp\left( \sum\nolimits_{x,y} log(\delta + L_{w}(x,y)) \right) \]
+   Where \( L_{w} \) is the luminance for pixel \( (x, y) \), in this project, it the radiance map. \delta which is 0.0001 in this project is a small value to avoid the singularity that occurs if black pixels are present in the image.
+
+   \[ L(x, y) = \frac{a}{\bar{L}_{w}} L_{w}(x,y) \]
+
+   We can change the value of /a/ to get different result. Then finally,
+
+   \[ L_{d}(x, y) = \frac{L(x,y)}{1+L(x,y)} \]
+
+
+** Local operator Durand
+   \[ L_{input} = \log(input intensity) \]
+   \[ L_{base} = Bilateral(\log(L_{input})) \]
+   \[ L_{detail} = L_{input} - L_{base} \]
+   \[ L_{output} = L_{base}*compressionfactor + L_{detail} - \max(L_{base})*compressionfactor \]
+
+   Where /compressionfactor/ is
+   \[ compressionfactor = targetContrast / ( \max(L_{base}) - \min(L_{base})) \]
+   The value /targetContrast/ is 50 in this project.
+
+* Implementation
+  + Python
+  + PIL(Python Imaging Library)
+  + Numpy
+  + matplotlib
+  + OpenCV
+  + pyside(GUI)
+
+* Usage
+
+* Results
+
+
+* References
+  1. Debevec, Paul E., and Jitendra Malik. /Recovering high dynamic range radiance maps from photographs./ ACM SIGGRAPH 2008 classes. ACM, 2008.
+  2. Durand, Frédo, and Julie Dorsey. /Fast bilateral filtering for the display of high-dynamic-range images./ ACM Transactions on Graphics (TOG). Vol. 21. No. 3. ACM, 2002.
+  3. Reinhard, Erik, et al. /Photographic tone reproduction for digital images./ ACM Transactions on Graphics (TOG). Vol. 21. No. 3. ACM, 2002.
