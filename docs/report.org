@@ -3,76 +3,84 @@
 #+LATEX_HEADER: \usepackage{amsmath}
 
 * Introduction
-  In this project, we create HDR(High dynamic range) images from a set of low dynamic range images with different exposure times. The method in the project consists of two parts: radiance map reconstruction and tone mapping. Radiance map is basedon the paper "Recovering high dynamic range radiance maps from photographs" by P. Debevec and J. Malik. And two tone mapping operators, based on Durand 2002 and E. Reinhard 2002 are implemented.
+  In this project, we create HDR(High dynamic range) images from a set of low dynamic range images with different exposure times. The method in the project consists of two parts: radiance map reconstruction and tone mapping. Radiance map is based on the paper "Recovering high dynamic range radiance maps from photographs" by P. Debevec and J. Malik. And two tone mapping operators, based on Durand 2002 and E. Reinhard 2002 are implemented.
 
 * Radiance Map Reconstruction
   It takes two steps to reconstruct the radiance map.
   1. Recovering the response curve
   2. Constructing the High Dynamic Range Radiance Map
+
 ** Recovering the response curve
+   In a image, we get the pixel value /Z/ from a nonlinear function of the original exposure /X/ at the pixel. We call the function /f/. And the exposure /X/ is defined as the product of the irradiance /E/ and the exposure time \( \Delta t \). We denote the pixel value \( Z_{ij} \) where /i/ is the index of pixel in an image and /j/ is the index of exposure time \( \Delta t_{j} \). Then we get
    \[ Z_{ij} = f(E_{i}\Delta t_{j}) \]
-
+   We assume that /f/ is monotonic, and we rewrite it as
    \[ f^{-1}(Z_{ij}) = E_{i}\Delta t_{j} \]
-
+   Take the natural logarithm,
    \[ \ln f^{-1}(Z_{ij}) = \ln E_{i} + \ln \Delta t_{j} \]
-
-   define \(g = \ln f^{-1} \), then
-
+   Define \(g = \ln f^{-1} \), then
    \[ g(Z_{ij}) = \ln E_{i} + \ln \Delta t_{j} \]
-
-
+   We notice that recovering /g/ only need to recover finite number of \( g(z) \) since the input /Z/ only has finite values. Then we reformulate the problem to minimize the folling quadratic function.
    \[ \mathcal{O} = \sum\limits_{i=1}^{N} \sum\limits_{j=1}^{P}\left[ g(Z_{ij})-\ln E_{i} - \ln \Delta{t_{j}} \right]^{2} + \lambda \sum\limits_{z=Z_{min}+1}^{Z_{max}-1} g''(z)^{2} \]
-
+   Where Z_{min} and Z_{max} are the least and greatest pixel values, /N/ is the number of pixels and /P/ is the number of photos with different exposure times. Then we introduce a weighting function \( w(z) \):
    \[
    w(z) = \left\{ \begin{array}{rl}
    z - Z_{min} & \text{for } z \leq \frac{1}{2}(Z_{min}+Z_{max}) \\
    Z_{max} - z & \text{for } z > \frac{1}{2}(Z_{min}+Z_{max})
    \end{array} \right.
    \]
-
+   Then finaly the function becomes:
    \[ \mathcal{O} = \sum\limits_{i=1}^{N} \sum\limits_{j=1}^{P}
    \left\{ w(Z_{ij})\left[ g(Z_{ij})-\ln E_{i} - \ln \Delta{t_{j}} \right]\right\}^{2} + \lambda \sum\limits_{z=Z_{min}+1}^{Z_{max}-1} [w(z)g''(z)]^{2} \]
+   As mentioned in the paper, it is not necessary to use all the pixels of images to. In our case, We take unifrom samples in the images and the number of samples can be ajusted.
 
 ** Constructing the radiance map
+   After recovering the response curve /g/, we can use it to convert pixel values to radiance values. In the previous section, we get:
 
    \[ \ln E_{i} = g(Z_{ij}) - \ln \Delta t_{j} \]
 
+   And for robustness, we can reuse the weighting function \( w(z) \) so that all the exposure times can be used. So, it becomes:
+
    \[ \ln E_{i} = \frac{\sum\limits_{j=1}^{P} w(Z_{ij})(g(Z_{ij} - \ln \Delta t_{j}))}{ \sum\limits_{j=1}^{P}w(Z_{ij})} \]
+
+** Color
+   For color images, we only need to do the same two steps for all channels
 
 * Tone mapping
   Though we have the radiance map now, we still can not display the image in high dynamic range because all the screens , monitors and projectors only have a limited dynamic range. So we have to use the /Tone mapping/ method to approximate the appearance of HDR images in a medium that has limited dynamic range. And there are many different /tone mapping/ operators.
+
 ** Simple operators
    There are some very simple operators. The first one is just simply linearly mapping the radiance map into 0-255 to produce the result.
-   \[ I = (E - \min(E)) / (\max(E) - \min(E)) * 255 \]
-
+   \[ I = \frac{E - \min(E)}{\max(E) - \min(E)} * 255 \]
    We can also first map E to \( E/(E+1) \) before mapping to 255, thus
-
-   \[ I = E/(E+1) * 255 \]
-
+   \[ I = \frac{E}{E+1} * 255 \]
    But those simple operators can not get a result good enough. We need some operators more accuracy.
 
 ** Global operator Reinhards
-   we view the log-average luminance as a useful approximation to the key of the scene. This quantity \( \overline{L}_{w} \)is computed by:
-
-   \[ \overline{L}_{w} = \frac{1}{N} exp\left( \sum\nolimits_{x,y} log(\delta + L_{w}(x,y)) \right) \]
-   Where \( L_{w} \) is the luminance for pixel \( (x, y) \), in this project, it the radiance map. \delta which is 0.0001 in this project is a small value to avoid the singularity that occurs if black pixels are present in the image.
-
+   First we calculate the luminance map from radiance map. For a color image with 3 channels:
+   \[ L = 0.27R + 0.67G + 0.06B \]
+   Where R, G, B is the radianca map value of different channels.
+   We view the log-average luminance as a useful approximation to the key of the scene. This quantity \( \overline{L} \) is computed by:
+   \[ \overline{L} = \frac{1}{N} exp\left( \sum\nolimits_{x,y} log(\delta + L(x,y)) \right) \]
+   Where \( L \) is the luminance for pixel \( (x, y) \). \delta which is 0.0001 in this project is a small value to avoid the singularity that occurs if black pixels are present in the image.
    \[ L(x, y) = \frac{a}{\bar{L}_{w}} L_{w}(x,y) \]
-
    We can change the value of /a/ to get different result. Then finally,
-
    \[ L_{d}(x, y) = \frac{L(x,y)}{1+L(x,y)} \]
-
+   Then we need to recover the color from the output luminance.
+   \[ C_{out} = \left( \frac{C_{in}}{L} \right)^{s} L_{d} \]
+   Where \( C_{in} = R, G, B \). The exponent /s/ controls the color saturation of the resulting image. According the paper, a value from 0.4 to 0.6 can produce satisfactory results. After getting /C_{out}/, we can then use simple operator to map it to [0, 255].
 
 ** Local operator Durand
-   \[ L_{input} = \log(input intensity) \]
-   \[ L_{base} = Bilateral(\log(L_{input})) \]
+   For this operator, we also need to make a mapping from radiance maps to luminance intensity. But here, we need to take the logarithm of luminance.
+   \[ intensity = 0.27R + 0.67G + 0.06B \]
+   \[ L_{input} = \log(intensity) \]
+   \[ L_{base} = Bilateral(L_{input}) \]
    \[ L_{detail} = L_{input} - L_{base} \]
-   \[ L_{output} = L_{base}*compressionfactor + L_{detail} - \max(L_{base})*compressionfactor \]
-
-   Where /compressionfactor/ is
-   \[ compressionfactor = targetContrast / ( \max(L_{base}) - \min(L_{base})) \]
-   The value /targetContrast/ is 50 in this project.
+   \[ L_{output} = L_{base}*c + L_{detail} - \max(L_{base})*c \]
+   Where /c/ is the compression factor which equals:
+   \[ c = \frac{targetContrast}{\max(L_{base}) - \min(L_{base})} \]
+   The value /targetContrast/ is 50 in this project. Then we recover color from luminance.
+   \[ C_{out} = \frac{C_{in}}{intensity}exp(L_{out}) \]
+   Where \( C_{in} = R, G, B \).
 
 * Implementation
   + Python
@@ -88,6 +96,7 @@
 
 
 * References
-  1. Debevec, Paul E., and Jitendra Malik. /Recovering high dynamic range radiance maps from photographs./ ACM SIGGRAPH 2008 classes. ACM, 2008.
-  2. Durand, Frédo, and Julie Dorsey. /Fast bilateral filtering for the display of high-dynamic-range images./ ACM Transactions on Graphics (TOG). Vol. 21. No. 3. ACM, 2002.
-  3. Reinhard, Erik, et al. /Photographic tone reproduction for digital images./ ACM Transactions on Graphics (TOG). Vol. 21. No. 3. ACM, 2002.
+  1. Debevec, P. E., & Malik, J. (2008, August). /Recovering high dynamic range radiance maps from photographs/. In ACM SIGGRAPH 2008 classes (p. 31). ACM.
+  2. Durand, F., & Dorsey, J. (2002, July). /Fast bilateral filtering for the display of high-dynamic-range images/. In ACM Transactions on Graphics (TOG) (Vol. 21, No. 3, pp. 257-266). ACM.
+  3. Reinhard, E., Stark, M., Shirley, P., & Ferwerda, J. (2002, July). /Photographic tone reproduction for digital images/. In ACM Transactions on Graphics (TOG) (Vol. 21, No. 3, pp. 267-276). ACM.
+  4. Fattal, R., Lischinski, D., & Werman, M. (2002, July). /Gradient domain high dynamic range compression/. In ACM Transactions on Graphics (TOG) (Vol. 21, No. 3, pp. 249-256). ACM.
