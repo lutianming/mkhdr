@@ -10,6 +10,7 @@ matplotlib.rcParams['backend.qt4'] = 'PySide'
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
+
 class HDRSignal(QObject):
     sig = Signal(Image)
 
@@ -104,7 +105,7 @@ class ImageWindow(QMainWindow):
         label.setFont(font)
         formbox.addRow(label)
         self.sigma_r_box = QDoubleSpinBox(toolbox)
-        self.sigma_r_box.setRange(0, 1)
+        self.sigma_r_box.setRange(0, 200)
         self.sigma_r_box.setSingleStep(0.01)
         formbox.addRow('sigma r', self.sigma_r_box)
 
@@ -220,7 +221,7 @@ class ImageWindow(QMainWindow):
         ax = self.figure.add_subplot(111)
         ax.clear()
         for channel in range(channels):
-            ax.plot(x, g[channel, :])
+            ax.plot(g[channel, :], x)
         # refresh canvas
         self.canvas.draw()
 

@@ -3,6 +3,7 @@ from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
+from skimage.filter import denoise_bilateral
 
 LAMBDA = 'lambda'
 SMOOTH = 'smooth'
@@ -12,6 +13,7 @@ SIGMA_D = 'sigma_d'
 A = 'a'
 SATURATION = 'saturation'
 
+
 def list_files(d):
     full_path = [os.path.join(d, f) for f in os.listdir(d)]
     files = [f for f in full_path
@@ -20,15 +22,38 @@ def list_files(d):
 
 
 def read_images(filenames):
-    images = []
-    for f in filenames:
-        image = Image.open(f)
-        images.append(image)
+    names = {os.path.basename(f): f for f in filenames}
 
-    # sort by image exposure time
-    images.sort(key=exposure_time)
-    times = np.array([exposure_time(im) for im in images])
-    images = [np.array(im, dtype=np.int) for im in images]
+    if "config.txt" in names:
+        timedic = {}
+        #read times
+        config = names["config.txt"]
+        with open(config, "r") as f:
+            lines = f.readlines()
+            for line in lines:
+                tokens = line.split(" ")
+                timedic[tokens[0]] = float(tokens[1])
+        imagedic = {}
+        for k, v in names.items():
+            if k == "config.txt":
+                continue
+            image = Image.open(v)
+            imagedic[k] = image
+        images = []
+        times = []
+        for k in imagedic.keys():
+            images.append(np.array(imagedic[k], dtype=np.int))
+            times.append(timedic[k])
+    else:
+        images = []
+        for f in filenames:
+            image = Image.open(f)
+            images.append(image)
+
+        # sort by image exposure time
+        images.sort(key=exposure_time)
+        times = np.array([exposure_time(im) for im in images])
+        images = [np.array(im, dtype=np.int) for im in images]
     return images, times
 
 
@@ -123,31 +148,38 @@ def global_simple(E):
 
 
 def luminance(R, G, B):
-    return 0.2989*R+0.5866*G+0.1145*B
+    return 0.27*R+0.67*G+0.06*B
 
 
-def local_durand(E, sigma_r=0.4, sigma_d=100):
-    intensity = luminance(E[:, :, 0],
-                          E[:, :, 1],
-                          E[:, :, 2])
-
+def local_durand(E, sigma_r=0.4, sigma_d=50):
+    intensity = 20*E[:, :, 0] + 40*E[:, :, 1] + E[:, :, 2]
+    intensity = intensity/61
+    # intensity = luminance(E[:, :, 0],
+    #                       E[:, :, 1],
+    #                       E[:, :, 2])
     x, y = intensity.shape
     n_channels = 3
-    log_in_intensity = np.log(intensity).astype(np.float32)
-    # log_base = filter.denoise_bilateral(log_in_intensity, sigma_r, sigma_d)
-    log_base = cv2.bilateralFilter(log_in_intensity, 5, 50, 50)
+    log_in_intensity = np.log10(intensity).astype(np.float32)
+    log_base = cv2.bilateralFilter(log_in_intensity, 3, sigma_r, sigma_d)
     log_detail = log_in_intensity - log_base
 
-    compressFactor = np.log(50) / (np.max(log_base) - np.min(log_base))
+    compressFactor = np.log10(50) / (np.max(log_base) - np.min(log_base))
     scaleFactor = np.max(log_base)*compressFactor
 
     log_out_intensity = log_base*compressFactor - scaleFactor + log_detail
+    out_intensity = 10**(log_out_intensity)
 
     img = np.zeros((x, y, n_channels))
     for i in range(n_channels):
-        channel = E[:, :, i] / intensity
-        channel = channel*np.exp(log_out_intensity)
-        img[:, :, i] = channel / (1 + channel) * 255
+        # channel = np.power(E[:, :, i] / intensity, 0.6) * out_intensity
+        # channel = channel * 255
+        # channel[channel > 255] = 255
+        # img[:, :, i] = channel
+
+        channel = E[:, :, i] / intensity * out_intensity
+        channel = channel/np.max(channel)
+        img[:, :, i] = channel**(1/2.2) * 255
+        # img[:, :, i] = (channel / (1 + channel))**(1/2.2) * 255
     return img
 
 
