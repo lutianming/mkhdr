@@ -2,6 +2,8 @@
 #+AUTHOR: LU Tianming, TAI Yang
 #+LATEX_HEADER: \usepackage{amsmath}
 
+\newpage
+
 * Introduction
   In this project, we create HDR(High dynamic range) images from a set of low dynamic range images with different exposure times. The method in the project consists of two parts: radiance map reconstruction and tone mapping. Radiance map is based on the paper "Recovering high dynamic range radiance maps from photographs" by P. Debevec and J. Malik. And two tone mapping operators, based on Durand 2002 and E. Reinhard 2002 are implemented.
 
@@ -31,7 +33,8 @@
    Then finaly the function becomes:
    \[ \mathcal{O} = \sum\limits_{i=1}^{N} \sum\limits_{j=1}^{P}
    \left\{ w(Z_{ij})\left[ g(Z_{ij})-\ln E_{i} - \ln \Delta{t_{j}} \right]\right\}^{2} + \lambda \sum\limits_{z=Z_{min}+1}^{Z_{max}-1} [w(z)g''(z)]^{2} \]
-   As mentioned in the paper, it is not necessary to use all the pixels of images to. In our case, We take unifrom samples in the images and the number of samples can be ajusted.
+   The value \lambda controls the smooth of the curve.
+   As mentioned in the paper, it is unnecessary and computationally expensive to use all the pixels of images to recover the curve. So in our case, We take unifrom samples in the images and the number of samples can be ajusted.
 
 ** Constructing the radiance map
    After recovering the response curve /g/, we can use it to convert pixel values to radiance values. In the previous section, we get:
@@ -48,39 +51,47 @@
 * Tone mapping
   Though we have the radiance map now, we still can not display the image in high dynamic range because all the screens , monitors and projectors only have a limited dynamic range. So we have to use the /Tone mapping/ method to approximate the appearance of HDR images in a medium that has limited dynamic range. And there are many different /tone mapping/ operators.
 
-** Simple operators
-   There are some very simple operators. The first one is just simply linearly mapping the radiance map into 0-255 to produce the result.
+** Global operators
+   They are non-linear functions based on the luminance and other global variables of the image. Once the optimal function has been estimated according to the particular image, every pixel in the image is mapped in the same way, independent of the value of surrounding pixels in the image. Those techniques are simple and fast.
+
+   One simple global operator is just simply linearly mapping the radiance map into 0-255 to produce the result.
    \[ I = \frac{E - \min(E)}{\max(E) - \min(E)} * 255 \]
    We can also first map E to \( E/(E+1) \) before mapping to 255, thus
    \[ I = \frac{E}{E+1} * 255 \]
-   But those simple operators can not get a result good enough. We need some operators more accuracy.
+   But those operators are so simple that they cause a loss of constrast. We need some operators more accuracy.
 
-** Global operator Reinhards
+*** Reinhard
+    In our project, we implement a global operator based on the paper /Photographic tone reproduction for digital images/. Though it is a global operator, it has a good performance.
+
    First we calculate the luminance map from radiance map. For a color image with 3 channels:
    \[ L = 0.27R + 0.67G + 0.06B \]
    Where R, G, B is the radianca map value of different channels.
-   We view the log-average luminance as a useful approximation to the key of the scene. This quantity \( \overline{L} \) is computed by:
-   \[ \overline{L} = \frac{1}{N} exp\left( \sum\nolimits_{x,y} log(\delta + L(x,y)) \right) \]
-   Where \( L \) is the luminance for pixel \( (x, y) \). \delta which is 0.0001 in this project is a small value to avoid the singularity that occurs if black pixels are present in the image.
+   We view the log-average luminance as a useful approximation to the key of the scene. This quantity \( \overline{L}_{w} \) is computed by:
+   \[ \overline{L} = \frac{1}{N} exp\left( \sum\nolimits_{x,y} log(\delta + L_{w}(x,y)) \right) \]
+   Where \( L_{w} \) is the "world" luminance for pixel \( (x, y) \) from radiance map. \delta which is 0.0001 in this project is a small value to avoid the singularity that occurs if black pixels are present in the image.
    \[ L(x, y) = \frac{a}{\bar{L}_{w}} L_{w}(x,y) \]
    We can change the value of /a/ to get different result. Then finally,
    \[ L_{d}(x, y) = \frac{L(x,y)}{1+L(x,y)} \]
-   Then we need to recover the color from the output luminance.
+   Then we need to recover the color from the output luminance. We use the method in the paper /Gradient domain high dynamic range compression/.
    \[ C_{out} = \left( \frac{C_{in}}{L} \right)^{s} L_{d} \]
-   Where \( C_{in} = R, G, B \). The exponent /s/ controls the color saturation of the resulting image. According the paper, a value from 0.4 to 0.6 can produce satisfactory results. After getting /C_{out}/, we can then use simple operator to map it to [0, 255].
+   Where \( C_{in} = R, G, B \). The exponent /s/ controls the color saturation of the resulting image. According the paper, a value from 0.4 to 0.6 can produce satisfactory results. After getting /C_{out}/, we can then use simple operator to map it to [0, 255]. After that, we can make a gamma correction. But it is optional.
 
-** Local operator Durand
-   For this operator, we also need to make a mapping from radiance maps to luminance intensity. But here, we need to take the logarithm of luminance.
+** Local operator
+   The parameters of the non-linear function change in each pixel, according to features extracted from the surrounding parameters. In other words, the effect of the algorithm changes in each pixel according to the local features of the image. Those algorithms are more complicated than the global ones. But they can provide better performance.
+
+   In this project, we implement the operator based on bilateral filter which is a non-linear, edge-preserving and noise-reducing smoothing filter for images.
+   For this operator, we also need to make a mapping from radiance maps to luminance intensity. We follow the step provided by [[http://people.csail.mit.edu/fredo/PUBLI/Siggraph2002/][Durand]]:
    \[ intensity = 0.27R + 0.67G + 0.06B \]
-   \[ L_{input} = \log(intensity) \]
-   \[ L_{base} = Bilateral(L_{input}) \]
-   \[ L_{detail} = L_{input} - L_{base} \]
-   \[ L_{output} = L_{base}*c + L_{detail} - \max(L_{base})*c \]
+   Intensity here is the same as luminance in the previeus section.
+   \[ \begin{align*}
+   L_{input} &= \log(intensity) \\
+   L_{base} &= Bilateral(L_{input}) \\
+   L_{detail} &= L_{input} - L_{base} \\
+   L_{output} &= L_{base}*c + L_{detail} - \max(L_{base})*c
+   \end{align*} \]
    Where /c/ is the compression factor which equals:
    \[ c = \frac{targetContrast}{\max(L_{base}) - \min(L_{base})} \]
-   The value /targetContrast/ is 50 in this project. Then we recover color from luminance.
-   \[ C_{out} = \frac{C_{in}}{intensity}exp(L_{out}) \]
-   Where \( C_{in} = R, G, B \).
+   The value /targetContrast/ is 5 in this project. Then we recover color from luminance. We use the same method mentions in the previeus section.
 
 * Implementation
   + Python
@@ -93,7 +104,15 @@
 * Usage
 
 * Results
+  We apply our implementation to some public test images.
 
+
+* Conclusions
+  From the results we can see that local operator can have a good performance but it need to be used carefully with parameter tuning. Simple global operators can have a good performance in some conditions. But the global operator /Reinhard/ has a performance as good as the local one.
+
+  There are also some problems in the result. When there is artificial light or an extremely bright part in the image, the HDR result of such part is over bright.
+
+  What's more, the algorithm now only considers that all the original images are taken perfectly in the same position and angle. In other word, the algorithm only works when all the images are same and static. But this is difficult to achieve with a normal camera.
 
 * References
   1. Debevec, P. E., & Malik, J. (2008, August). /Recovering high dynamic range radiance maps from photographs/. In ACM SIGGRAPH 2008 classes (p. 31). ACM.
