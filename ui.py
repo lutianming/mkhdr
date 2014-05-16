@@ -100,6 +100,15 @@ class ImageWindow(QMainWindow):
                                         "global_reinhards",
                                         "local_durand"])
         formbox.addRow('tone mapping op', self.tone_mapping_box)
+        self.saturation_box = QDoubleSpinBox(toolbox)
+        self.saturation_box.setRange(0, 10)
+        self.saturation_box.setSingleStep(0.01)
+        formbox.addRow('saturation', self.saturation_box)
+
+        self.gamma_box = QDoubleSpinBox(toolbox)
+        self.saturation_box.setRange(0.1, 5)
+        self.saturation_box.setSingleStep(0.1)
+        formbox.addRow('gamma', self.gamma_box)
 
         label = QLabel('parameters for local durand')
         label.setFont(font)
@@ -121,10 +130,6 @@ class ImageWindow(QMainWindow):
         self.a_box.setSingleStep(0.01)
         formbox.addRow('a', self.a_box)
 
-        self.saturation_box = QDoubleSpinBox(toolbox)
-        self.saturation_box.setRange(0, 1)
-        self.saturation_box.setSingleStep(0.01)
-        formbox.addRow('saturation', self.saturation_box)
         self._reset_parameters()
 
         #figure to show g plot
@@ -201,6 +206,7 @@ class ImageWindow(QMainWindow):
         args['sigma_d'] = self.sigma_d_box.value()
         args['a'] = self.a_box.value()
         args['saturation'] = self.saturation_box.value()
+        args['gamma'] = self.gamma_box.value()
         return args
 
     def _reset_parameters(self):
@@ -213,6 +219,7 @@ class ImageWindow(QMainWindow):
         self.sigma_d_box.setValue(args['sigma_d'])
         self.a_box.setValue(args['a'])
         self.saturation_box.setValue(args['saturation'])
+        self.gamma_box.setValue(args['gamma'])
 
     def plot_g(self):
         x = range(0, 256)

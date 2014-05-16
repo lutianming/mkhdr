@@ -34,6 +34,8 @@ if __name__ == '__main__':
                         help='a used in global reinhards operator')
     parser.add_argument('--saturation', type=float, default=0.6,
                         help='saturation used in global reinhards operator')
+    parser.add_argument('--gamma', type=float, default=1,
+                        help='gamma correction')
     # parse arguments
     args = parser.parse_args()
 

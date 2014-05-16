@@ -151,19 +151,19 @@ def luminance(R, G, B):
     return 0.27*R+0.67*G+0.06*B
 
 
-def local_durand(E, sigma_r=0.4, sigma_d=50):
-    intensity = 20*E[:, :, 0] + 40*E[:, :, 1] + E[:, :, 2]
-    intensity = intensity/61
-    # intensity = luminance(E[:, :, 0],
-    #                       E[:, :, 1],
-    #                       E[:, :, 2])
+def local_durand(E, sigma_r=0.4, sigma_d=50, saturation=0.6, gamma=1):
+    # intensity = 20*E[:, :, 0] + 40*E[:, :, 1] + E[:, :, 2]
+    # intensity = intensity/61.0
+    intensity = luminance(E[:, :, 0],
+                          E[:, :, 1],
+                          E[:, :, 2])
     x, y = intensity.shape
     n_channels = 3
     log_in_intensity = np.log10(intensity).astype(np.float32)
-    log_base = cv2.bilateralFilter(log_in_intensity, 3, sigma_r, sigma_d)
+    log_base = cv2.bilateralFilter(log_in_intensity, 5, sigma_r, sigma_d)
     log_detail = log_in_intensity - log_base
 
-    compressFactor = np.log10(50) / (np.max(log_base) - np.min(log_base))
+    compressFactor = np.log10(5) / (np.max(log_base) - np.min(log_base))
     scaleFactor = np.max(log_base)*compressFactor
 
     log_out_intensity = log_base*compressFactor - scaleFactor + log_detail
@@ -171,19 +171,14 @@ def local_durand(E, sigma_r=0.4, sigma_d=50):
 
     img = np.zeros((x, y, n_channels))
     for i in range(n_channels):
-        # channel = np.power(E[:, :, i] / intensity, 0.6) * out_intensity
-        # channel = channel * 255
-        # channel[channel > 255] = 255
-        # img[:, :, i] = channel
-
-        channel = E[:, :, i] / intensity * out_intensity
-        channel = channel/np.max(channel)
-        img[:, :, i] = channel**(1/2.2) * 255
-        # img[:, :, i] = (channel / (1 + channel))**(1/2.2) * 255
+        channel = np.power(E[:, :, i] / intensity, saturation) * out_intensity
+        channel = channel**(1/gamma) * 255
+        channel[channel > 255] = 255
+        img[:, :, i] = channel
     return img
 
 
-def global_reinhards(E, a=0.48, saturation=0.6):
+def global_reinhards(E, a=0.48, saturation=0.6, gamma=1):
     delta = 0.0001
 
     L = luminance(E[:, :, 0],
@@ -199,10 +194,11 @@ def global_reinhards(E, a=0.48, saturation=0.6):
     img = np.zeros((x, y, 3))
     for i in range(3):
         channel = np.power(E[:, :, i] / L, saturation) * L_d
-        channel = channel * 255
+        channel = channel**(1/gamma) * 255
         channel[channel > 255] = 255
         img[:, :, i] = channel
     return img
+
 
 def gamma_correct(img, gamma):
     img = np.power(img, gamma)
@@ -213,9 +209,10 @@ tone_mapping_operators = {
     "global_simple":
     lambda E, args: global_simple(E),
     "global_reinhards":
-    lambda E, args: global_reinhards(E, args['a'], args['saturation']),
+    lambda E, args: global_reinhards(E, args['a'], args['saturation'], args['gamma']),
     "local_durand":
-    lambda E, args: local_durand(E, args['sigma_r'], args['sigma_d'])}
+    lambda E, args: local_durand(E, args['sigma_r'], args['sigma_d'],
+                                 args['saturation'], args['gamma'])}
 
 
 def default_args(args):
@@ -260,8 +257,9 @@ def make_hdr(images, times, args=None):
 
     img = tone_mapping(E, args)
     img = Image.fromarray(img.astype(np.int8), mode='RGB')
-    # x = np.arange(0, 256)
-    # for g in gs:
-    #     plt.plot(g, x)
+
+    # channels = g.shape[0]
+    # for channel in range(channels):
+    #     plt.plot(g[channel, :], range(256))
     # plt.show()
     return img, g
