@@ -142,8 +142,9 @@ def radiance_map(g, imgs, times, w):
     return np.exp(lnE.reshape((width, height)))
 
 
-def global_simple(E):
-    p = E / (E+1) * 255
+def global_simple(E, gamma=1):
+    p = E / (E+1)
+    p = p**(1/gamma) * 255
     return p
 
 
@@ -207,8 +208,8 @@ def gamma_correct(img, gamma):
 #tone mapping operator warppers so that they all except same args
 tone_mapping_operators = {
     "global_simple":
-    lambda E, args: global_simple(E),
-    "global_reinhards":
+    lambda E, args: global_simple(E, args['gamma']),
+    "global_reinhard":
     lambda E, args: global_reinhards(E, args['a'], args['saturation'], args['gamma']),
     "local_durand":
     lambda E, args: local_durand(E, args['sigma_r'], args['sigma_d'],
