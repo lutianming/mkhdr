@@ -97,7 +97,7 @@ class ImageWindow(QMainWindow):
         formbox.addRow(label)
         self.tone_mapping_box = QComboBox(toolbox)
         self.tone_mapping_box.addItems(["global_simple",
-                                        "global_reinhards",
+                                        "global_reinhard",
                                         "local_durand"])
         formbox.addRow('tone mapping op', self.tone_mapping_box)
         self.saturation_box = QDoubleSpinBox(toolbox)
@@ -122,7 +122,7 @@ class ImageWindow(QMainWindow):
         self.sigma_d_box.setRange(0, 200)
         formbox.addRow('sigma d', self.sigma_d_box)
 
-        label = QLabel('parameters for global reinhards')
+        label = QLabel('parameters for global reinhard')
         label.setFont(font)
         formbox.addRow(label)
         self.a_box = QDoubleSpinBox(toolbox)

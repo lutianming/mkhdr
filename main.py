@@ -15,7 +15,7 @@ if __name__ == '__main__':
     parser.add_argument('-g', '--gui',
                         help='use gui interface', action='store_true')
     parser.add_argument('-tmp', '--tone-mapping-op',
-                        default="global_reinhards",
+                        default="global_reinhard",
                         choices=["global_simple", "global_reinhards",
                                  "local_durand"],
                         help="tone mapping operator. Supported options: \

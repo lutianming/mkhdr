@@ -222,7 +222,7 @@ def default_args(args):
     if "lambda" not in args:
         args["lambda"] = 50
     if "tone_mapping_op" not in args:
-        args["tone_mapping_op"] = "global_reinhards"
+        args["tone_mapping_op"] = "global_reinhard"
     return args
 
 
