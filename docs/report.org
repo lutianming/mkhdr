@@ -1,5 +1,6 @@
-#+TITLE: Project SI241: Creation HDR images
+#+TITLE: Project SI241: Creation of HDR images
 #+AUTHOR: LU Tianming, TAI Yang
+#+options: toc:t
 #+LATEX_HEADER: \usepackage{amsmath}
 
 \newpage
@@ -21,20 +22,30 @@
    \[ \ln f^{-1}(Z_{ij}) = \ln E_{i} + \ln \Delta t_{j} \]
    Define \(g = \ln f^{-1} \), then
    \[ g(Z_{ij}) = \ln E_{i} + \ln \Delta t_{j} \]
-   We notice that recovering /g/ only need to recover finite number of \( g(z) \) since the input /Z/ only has finite values. Then we reformulate the problem to minimize the folling quadratic function.
+   We notice that recovering /g/ only need to recover finite number of \( g(z) \) since the input /Z/ only has finite values, from 0 to 255. Then we reformulate the problem to minimize the folling quadratic function.
    \[ \mathcal{O} = \sum\limits_{i=1}^{N} \sum\limits_{j=1}^{P}\left[ g(Z_{ij})-\ln E_{i} - \ln \Delta{t_{j}} \right]^{2} + \lambda \sum\limits_{z=Z_{min}+1}^{Z_{max}-1} g''(z)^{2} \]
-   Where Z_{min} and Z_{max} are the least and greatest pixel values, /N/ is the number of pixels and /P/ is the number of photos with different exposure times. Then we introduce a weighting function \( w(z) \):
+   Where Z_{min} and Z_{max} are the least and greatest pixel values, /N/ is the number of pixels and /P/ is the number of photos with different exposure times. The value \lambda controls the smooth of the curve.
+
+   Then we introduce a weighting function \( w(z) \):
    \[
    w(z) = \left\{ \begin{array}{rl}
    z - Z_{min} & \text{for } z \leq \frac{1}{2}(Z_{min}+Z_{max}) \\
    Z_{max} - z & \text{for } z > \frac{1}{2}(Z_{min}+Z_{max})
    \end{array} \right.
    \]
+
+   This function is to ensure that the midway between Z_{min} and Z_{max} will have unit exposure.
+
    Then finaly the function becomes:
    \[ \mathcal{O} = \sum\limits_{i=1}^{N} \sum\limits_{j=1}^{P}
    \left\{ w(Z_{ij})\left[ g(Z_{ij})-\ln E_{i} - \ln \Delta{t_{j}} \right]\right\}^{2} + \lambda \sum\limits_{z=Z_{min}+1}^{Z_{max}-1} [w(z)g''(z)]^{2} \]
-   The value \lambda controls the smooth of the curve.
+
    As mentioned in the paper, it is unnecessary and computationally expensive to use all the pixels of images to recover the curve. So in our case, We take unifrom samples in the images and the number of samples can be ajusted.
+
+   In the figure([[curve]]), we show some response curves from test images. We take 14*14 samples and the smooth factor is 50.
+   #+caption: response curves
+   #+name: curve
+   [[./curve.jpg]]
 
 ** Constructing the radiance map
    After recovering the response curve /g/, we can use it to convert pixel values to radiance values. In the previous section, we get:
@@ -46,7 +57,7 @@
    \[ \ln E_{i} = \frac{\sum\limits_{j=1}^{P} w(Z_{ij})(g(Z_{ij} - \ln \Delta t_{j}))}{ \sum\limits_{j=1}^{P}w(Z_{ij})} \]
 
 ** Color
-   For color images, we only need to do the same two steps for all channels
+   For color images, The steps are just the same. We only need to recover the response curve and contruct the radiance map for all the RGB channels.
 
 * Tone mapping
   Though we have the radiance map now, we still can not display the image in high dynamic range because all the screens , monitors and projectors only have a limited dynamic range. So we have to use the /Tone mapping/ method to approximate the appearance of HDR images in a medium that has limited dynamic range. And there are many different /tone mapping/ operators.
@@ -74,7 +85,7 @@
    \[ L_{d}(x, y) = \frac{L(x,y)}{1+L(x,y)} \]
    Then we need to recover the color from the output luminance. We use the method in the paper /Gradient domain high dynamic range compression/.
    \[ C_{out} = \left( \frac{C_{in}}{L} \right)^{s} L_{d} \]
-   Where \( C_{in} = R, G, B \). The exponent /s/ controls the color saturation of the resulting image. According the paper, a value from 0.4 to 0.6 can produce satisfactory results. After getting /C_{out}/, we can then use simple operator to map it to [0, 255]. After that, we can make a gamma correction. But it is optional.
+   Where \( C_{in} = R, G, B \). The exponent /s/ controls the color saturation of the result image. According the paper, a value from 0.4 to 0.6 can produce satisfactory results. After getting /C_{out}/, we can then use simple operator to map it to [0, 255]. After that, we can make a gamma correction. But it is optional.
 
 ** Local operator
    The parameters of the non-linear function change in each pixel, according to features extracted from the surrounding parameters. In other words, the effect of the algorithm changes in each pixel according to the local features of the image. Those algorithms are more complicated than the global ones. But they can provide better performance.
@@ -82,37 +93,67 @@
    In this project, we implement the operator based on bilateral filter which is a non-linear, edge-preserving and noise-reducing smoothing filter for images.
    For this operator, we also need to make a mapping from radiance maps to luminance intensity. We follow the step provided by [[http://people.csail.mit.edu/fredo/PUBLI/Siggraph2002/][Durand]]:
    \[ intensity = 0.27R + 0.67G + 0.06B \]
-   Intensity here is the same as luminance in the previeus section.
-   \[ \begin{align*}
+   Intensity here is the same as luminance in the previeus section. Then
+
+   \begin{align*}
    L_{input} &= \log(intensity) \\
    L_{base} &= Bilateral(L_{input}) \\
    L_{detail} &= L_{input} - L_{base} \\
    L_{output} &= L_{base}*c + L_{detail} - \max(L_{base})*c
-   \end{align*} \]
-   Where /c/ is the compression factor which equals:
-   \[ c = \frac{targetContrast}{\max(L_{base}) - \min(L_{base})} \]
-   The value /targetContrast/ is 5 in this project. Then we recover color from luminance. We use the same method mentions in the previeus section.
+   \end{align*}
 
-* Implementation
-  + Python
+   Where /c/ is the compression factor which equals to:
+   \[ c = \frac{targetContrast}{\max(L_{base}) - \min(L_{base})} \]
+   The value /targetContrast/ is 5 in this project. Then we recover colors from luminance. We use the same method mentions in the previeus section.
+
+* Implementation and Usage
+  We use Python with following frameworks to implment the project.
   + PIL(Python Imaging Library)
   + Numpy
   + matplotlib
   + OpenCV
   + pyside(GUI)
 
-* Usage
+  The project provides both a command line interface and graphic interface.
+  Most import parameters are ajustable, include:
+  + radiance map construction
+    + sample size
+    + smooth factor
+  + tone mapping
+    + saturation
+    + gamma
+    + other operator specific parameters
 
 * Results
-  We apply our implementation to some public test images.
+  We apply our implementation to some public test images. And figure([[result1]]), figure([[result2]]), figure([[result3]]), figure([[result4]]) are the results. All the result HDR images are generated with the default parameters, that is:
+  + sample size: 200
+  + smooth factor: 50
+  + saturation: 0.6
 
+  For Durand operator, \sigma_{r} is 0.4 and \sigma_{d} is 100. For Reinhard operator, /a/ is 0.36.
+
+  #+caption: result 1
+  #+name: result1
+  [[./result3.jpg]]
+
+  #+caption: result 2
+  #+name: result2
+  [[./result4.jpg]]
+
+  #+caption: result 3
+  #+name: result3
+  [[./result5.jpg]]
+
+  #+caption: result 4
+  #+name: result4
+  [[./result6.jpg]]
 
 * Conclusions
   From the results we can see that local operator can have a good performance but it need to be used carefully with parameter tuning. Simple global operators can have a good performance in some conditions. But the global operator /Reinhard/ has a performance as good as the local one.
 
-  There are also some problems in the result. When there is artificial light or an extremely bright part in the image, the HDR result of such part is over bright.
+  There are also some problems in the result. For example, in figure([[result1]]), when there is artificial light or an extremely bright part in the image, the HDR result of such part seems becom too bright and feel blue.
 
-  What's more, the algorithm now only considers that all the original images are taken perfectly in the same position and angle. In other word, the algorithm only works when all the images are same and static. But this is difficult to achieve with a normal camera.
+  What's more, the algorithm now only considers that all the original images are taken perfectly in the same position and angle. In other word, the algorithm only works when all the images are same and static. But this is difficult to achieve with a normal camera. It is common that there might be little shakes in the images even if you take multiple photos at the same position. So it will be better to improve the algorithm to work with such images.
 
 * References
   1. Debevec, P. E., & Malik, J. (2008, August). /Recovering high dynamic range radiance maps from photographs/. In ACM SIGGRAPH 2008 classes (p. 31). ACM.
